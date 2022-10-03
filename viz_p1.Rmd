@@ -1,0 +1,143 @@
+---
+title: "vis_p1"
+output: github_document
+date: "2022-10-03"
+---
+
+```{r}
+library(tidyverse)
+library(ggridges)
+```
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728", "USC00519397", "USS0023B17S"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(
+      id, 
+      USW00094728 = "CentralPark_NY", 
+      USC00519397 = "Waikiki_HA",
+      USS0023B17S = "Waterhole_WA"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+```{r}
+ggplot(weather_df, aes(x = tmin, y = tmax)) + geom_point()
+```
+```{r}
+weather_df %>%
+  drop_na() %>%
+  ggplot(aes(x = tmin, y = tmax)) + 
+  geom_point()
+```
+
+```{r}
+weather_scatterplot = 
+  weather_df %>%
+  drop_na() %>%
+  ggplot(aes(x = tmin, y = tmax))
+
+weather_scatterplot + geom_point()
+```
+
+```{r}
+ggplot(weather_df, aes(x = tmin, y = tmax)) + geom_point(aes(color = name))
+```
+
+```{r}
+weather_df %>%
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_point(aes(color = name)) +
+  geom_smooth()
+```
+```{r}
+weather_df %>%
+  ggplot(aes(x = tmin, y = tmax, color = name)) + #three lines because color applied to entire plot
+  geom_point(alpha = .3) + #adds transperancy to points
+  geom_smooth(se = FALSE) #no error bars
+```
+
+Make separate panels.
+
+```{r}
+weather_df %>%
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = .3) +
+  geom_smooth(se = FALSE) +
+  facet_grid(. ~name) #separate to 3 panels, make cols names(~ col or row~)
+```
+
+`tmax` vs `tmin` is boring, let's spice it up.
+
+```{r}
+weather_df %>%
+  ggplot(aes(x = date, y = tmax, color = name)) +
+  geom_point(aes(size = prcp), alpha = .3) +
+  geom_smooth(se = FALSE) +
+  facet_grid(. ~ name)
+```
+```{r}
+ggplot(weather_df, aes(x = tmax, y = tmin)) + 
+  geom_hex() #hex good for many rows
+```
+
+## Univariate plots
+
+Histograms, density plot, boxplots, violins, ...
+
+
+```{r}
+weather_df %>%
+  ggplot(aes(x=tmax, fill = name)) + #use fill to color historgram, color=name only colors the border
+  geom_histogram() +
+  facet_grid(. ~ name)
+```
+
+```{r}
+weather_df %>%
+  ggplot(aes(x = tmax, fill = name)) +
+  geom_density(alpha = .3)
+```
+```{r}
+weather_df %>%
+  ggplot(aes(x = name, y = tmax, fill = name)) + 
+  geom_boxplot()
+```
+
+```{r}
+weather_df %>%
+  ggplot(aes(x = name, y = tmax, fill = name)) + 
+  geom_violin() #violin gives entire distribution instead of IQR in boxplot, violin plot good for comparing 20(many) distributions
+```
+
+OR
+
+```{r}
+weather_df %>%
+  ggplot(aes(x = tmax, y = name)) +
+  geom_density_ridges()
+```
+
+## Saving and embedding plots
+
+First, let's save a plot.
+
+```{r}
+weather_scatterplot =
+  weather_df %>%
+  ggplot(aes(x = date, y = tmax, color = name)) +
+  geom_point(aes(size = prcp), alpha = .3) +
+  geom_smooth(se = FALSE) + 
+  facet_grid(. ~ name)
+
+weather_scatterplot
+```
+```{r}
+ggsave("results/weather_scatterplot.pdf", weather_scatterplot, width = 8, height = 5)
+```
+
+#font size of embedded figure can't be changed
