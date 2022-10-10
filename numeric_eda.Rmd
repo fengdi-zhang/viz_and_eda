@@ -1,13 +1,12 @@
 ---
-title: "vis_p2"
+title: "numeric_eda"
 output: github_document
 date: "2022-10-03"
 ---
 
 ```{r}
 library(tidyverse)
-library(ggridges)
-library(patchwork)
+
 ```
 
 ```{r}
@@ -24,175 +23,164 @@ weather_df =
       USC00519397 = "Waikiki_HA",
       USS0023B17S = "Waterhole_WA"),
     tmin = tmin / 10,
-    tmax = tmax / 10) %>%
+    tmax = tmax / 10,
+    month = lubridate::floor_date(date, unit = "month")) %>% #create month column, lubridate helps with date/time data, floor_date round date to the 1st of the month
   select(name, id, everything())
 ```
 
-## Scatter plot
-
-But better this time
+## `group_by()`
 
 ```{r}
 weather_df %>%
-  ggplot(aes(x = tmin, y = tmax, color = name)) +
-  geom_point(alpha = .5) +
-  labs(
-    x = "Minimum Daily Temp(C)",
-    y = "Maximum Daily Temp(C)",
-    title = "Scatterplot of daily temp extremes",
-    caption = "Data come from the rnoaa package"
-  ) + #labs adds captions
-  scale_x_continuous(
-    breaks = c(-10, 0, 15),
-    labels = c("10C", "0", "15")
-  ) + #can change scale
-  scale_y_continuous(
-    trans = "sqrt"
+  group_by(name, month) #creates 36 groups
+```
+
+## `summarize()`
+
+let's group and then summarize!
+
+```{r}
+weather_df %>%
+  group_by(name, month) %>%
+  summarize(
+    n_obs = n() #count number of rows of each group, result is a tibble, create new var n_obs
   )
 ```
 
-make a new version
-```{r}
-weather_df %>%
-  ggplot(aes(x = tmin, y = tmax, color = name)) +
-  geom_point(alpha = .5) +
-  labs(
-    x = "Minimum Daily Temp(C)",
-    y = "Maximum Daily Temp(C)",
-    title = "Scatterplot of daily temp extremes",
-    caption = "Data come from the rnoaa package"
-  ) +
-  scale_color_hue(
-    name = "Location", #change legend title
-    h = c(100,300)
-    ) #change color
-```
+can we count in other ways?
 
 ```{r}
 weather_df %>%
-  ggplot(aes(x = tmin, y = tmax, color = name)) +
-  geom_point(alpha = .5) +
-  labs(
-    x = "Minimum Daily Temp(C)",
-    y = "Maximum Daily Temp(C)",
-    title = "Scatterplot of daily temp extremes",
-    caption = "Data come from the rnoaa package"
-  ) +
-  viridis::scale_color_viridis( #color palatte
-    name = "Location",
-    discrete = TRUE
+  count(name, month)
+```
+
+don't use `table()`
+
+you can have multiple summaries
+```{r}
+weather_df %>%
+  group_by(month) %>%
+  summarize(
+    n_obs = n(),
+    n_dist = n_distinct(month) #count number of unique things
   )
 ```
 
-## Themes
-
+## a brief aside on 2x2 table
 ```{r}
-gg_weather = weather_df %>%
-  ggplot(aes(x = tmin, y = tmax, color = name)) +
-  geom_point(alpha = .5) +
-  labs(
-    x = "Minimum Daily Temp(C)",
-    y = "Maximum Daily Temp(C)",
-    title = "Scatterplot of daily temp extremes",
-    caption = "Data come from the rnoaa package"
-  ) +
-  viridis::scale_color_viridis( #color palatte
-    name = "Location",
-    discrete = TRUE
-  )
-```
-
-```{r}
-gg_weather +
-  theme(legend.position = "bottom") + #change legend position
-  theme_bw() #black and white theme, there are also theme_minimal(), theme_classic()
-```
-
-# Data in geom()
-
-```{r}
-central_park_df = 
-  weather_df %>%
-  filter(name == "CentralPark_NY")
-
-waikiki_df = 
-  weather_df %>%
-  filter(name == "Waikiki_HA")
-
-ggplot(waikiki_df, aes(x = date, y = tmax)) +
-  geom_point() +
-  geom_line(data = central_park_df)
-```
-
-## Patchwork
-
-```{r}
-tmax_tmin_plot = 
-  weather_df %>%
-  ggplot(aes(x = tmin, y = tmax, color = name)) +
-  geom_point() +
-  theme(legend.position = "none")
-
-prcp_density_plot = 
-  weather_df %>%
-  filter(prcp > 0) %>%
-  ggplot(aes(x = prcp, fill = name)) +
-  geom_density(alpha = 0.5) + 
-  theme(legend.position = "none")
-
-seasonality_plot = 
-  weather_df %>%
-  ggplot(aes(x = date, y = tmax, color = name)) +
-  geom_point() +
-  theme(legend.position = "none")
-
-tmax_tmin_plot + prcp_density_plot #patchwork put 2 figures side by side (dont use facet because not similar plot)
-
-(tmax_tmin_plot + prcp_density_plot) / seasonality_plot
-```
-
-## Data manipulation
-
-```{r}
-weather_df %>%
-  ggplot(aes(x = name, y = tmax)) +
-  geom_boxplot()
-```
-
-x-axis have to be factor variable, r use alphabetical order to convert char to factor. 
-
-```{r}
-weather_df %>%
-  mutate(name = fct_relevel(name, "Waikiki_HA")) %>%
-  ggplot(aes(x = name, y = tmax)) +
-  geom_boxplot()
-#put Waikiki first by factor relevel
-```
-
-```{r}
-weather_df %>%
-  mutate(name = fct_reorder(name, tmax)) %>%
-  ggplot(aes(x = name, y = tmax)) +
-  geom_boxplot()
-#reorder factor by tmax
-```
-
-```{r}
-pulse_data = 
-  haven::read_sas("./data/public_pulse_data.sas7bdat") %>%
-  janitor::clean_names() %>%
-  pivot_longer(
-    bdi_score_bl:bdi_score_12m,
-    names_to = "visit", 
-    names_prefix = "bdi_score_",
-    values_to = "bdi") %>%
-  select(id, visit, everything())  %>%
+weather_df %>% 
   mutate(
-    visit = fct_relevel(visit, "bl")
+    cold = case_when(
+      tmax <  5 ~ "cold",
+      tmax >= 5 ~ "not_cold",
+      TRUE      ~ ""
+  )) %>% 
+  filter(name != "Waikiki_HA") %>%
+  group_by(name, cold) %>%
+  summarize(
+    n_obs = n()
+  ) %>%
+  pivot_wider(
+    names_from = cold,
+    values_from = n_obs 
   )
+```
 
-pulse_data %>%
-  ggplot(aes(x = visit, y = bdi)) + 
-  geom_boxplot()
+```{r}
+weather_df %>% 
+  mutate(
+    cold = case_when(
+      tmax <  5 ~ "cold",
+      tmax >= 5 ~ "not_cold",
+      TRUE      ~ ""
+  )) %>% 
+  filter(name != "Waikiki_HA") %>%
+  janitor::tabyl(name, cold)
+```
+
+## General Summaries
+
+```{r}
+weather_df %>%
+  group_by(name, month) %>%
+  summarize(
+    n_obs = n(),
+    mean_tmax = mean(tmax, na.rm = TRUE), #remove na prior to compute the mean
+    sd_prcp = sd(prcp),
+    median_tmax = median(tmax, na.rm = TRUE)
+  )
+```
+
+
+```{r}
+weather_df %>%
+  group_by(name, month) %>%
+  summarize(across(prcp:tmin, mean)) #compute mean from var prcp to tmin
+```
+
+
+This is a dataframe!!!
+
+```{r}
+weather_df %>%
+  group_by(name, month) %>%
+  summarize(
+    mean_tmax = mean(tmax, na.rm = TRUE)
+  ) %>%
+  ggplot(aes( x = month, y = mean_tmax, color = name)) + 
+  geom_point() + 
+  geom_path()
+```
+
+```{r}
+weather_df %>%
+  group_by(name, month) %>%
+  summarize(
+    mean_tmax = mean(tmax, na.rm = TRUE)
+  ) %>%
+  pivot_wider(
+    names_from = name,
+    values_from = mean_tmax
+  ) %>%
+  knitr::kable(digit = 2) #not produce df, but a nicer looking table
+```
+
+
+## Grouped mutates
+
+```{r}
+weather_df %>%
+  group_by(name) %>%
+  mutate(
+    mean_tmax = mean(tmax, na.rm = TRUE),
+    centered_tmax = tmax - mean_tmax) %>%
+  ggplot(aes(x = date, y = centered_tmax, color = name)) + geom_point()
+View(weather_df)
+```
+
+
+lagged observation
+```{r}
+weather_df %>%
+  group_by(name) %>%
+  mutate(
+    yesterday_tmax = lag(tmax),
+    tmax_change = tmax - yesterday_tmax
+  ) %>%
+  summarize(
+    sd_tmax_change = sd(tmax_change, na.rm = TRUE)
+  )
+```
+
+One other window function..
+
+```{r}
+weather_df %>%
+  group_by(name, month) %>%
+  mutate(
+    tmax_rank = min_rank(tmax)
+  ) %>%
+  filter(tmax_rank < 4) %>%
+  arrange(name, month, tmax_rank)
 ```
 
